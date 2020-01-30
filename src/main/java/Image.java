@@ -1,35 +1,48 @@
 import java.io.*;
+import java.nio.file.Files;
+
 
 public class Image {
 
-    private String filename;
-    private File image;
 
-    public Image(String filename)   {
-        this.filename = filename;
-    }
+    static void getImageFromServer(File image, DataOutputStream dos) throws IOException {
 
-    public File getImageFromServer() {
-        String serverPath = "/Users/user/IdeaProjects/MultiServer/src/main/resources/" + filename;
-        image = new File(serverPath);
         if (image.exists()) {
-            return image;
-        } else return null;
-    }
+            System.out.println("Image Found on Server");
 
-    public String saveImageOnServer(String localPath, OutputStream os) {
-        image = new File(localPath);
-        int buf = (int) image.length();
-        try {
-            FileInputStream fos = new FileInputStream(image);
-            os.write(buf);
+            byte buf[] = new byte[100 * 1024];
+            FileInputStream fis = new FileInputStream(image);
+
+            while (fis.available() > 0)
+            {
+                //dos.write(fis.read(buf));
+                dos.writeUTF(image.getName());
+            }
+            fis.close();
         }
-        catch (IOException ex) {ex.getMessage(); }
-
-        return filename;
+        else {
+            System.out.println("File Not Found");
+            dos.writeUTF("HTTP 404 File Not Found\n");
+        }
     }
 
-    public String getFilename() {
-        return filename;
+    static String saveImageOnServer(File image, File serverCopy) throws IOException {
+
+        String response = "default";
+
+        if (serverCopy.exists()) {
+            response = "Image with same name already exists";
+            System.out.println(response);
+        }
+        else if (!image.exists()) {
+            response = "No image found";
+            System.out.println(response);
+        }
+        else {
+            Files.copy(image.toPath(), new FileOutputStream(serverCopy));
+            response = RestApi.postResponse(image.getName());
+        }
+
+        return response;
     }
 }

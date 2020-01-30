@@ -1,88 +1,65 @@
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+
 
 public class TaskServer {
 
 
+    public static void main(String[] args) throws IOException {
 
-    public static void main(String[] args) throws InterruptedException {
-
-        String imageStoreOnServerPath = "/Users/user/IdeaProjects/MultiServer/src/main/resources";
+        String resourcesPath = "/Users/user/IdeaProjects/MultiServer/src/main/resources"; // server image store
+        File resources = new File(resourcesPath);
+        String clientImagesPath = "/Users/user/Downloads"; // client's image store
 
         try (ServerSocket server = new ServerSocket(4444))  {
 
-            // сокету "client" ожидает подключения
-            Socket client = server.accept();
+            Socket client = server.accept();    // server socket opened
+            System.out.println("Connection accepted.\n");
 
-            // после хэндшейкинга сервер ассоциирует подключающегося клиента с этим сокетом-соединением
-            System.out.println("Connection accepted.");
-
-            // каналы чтения/записи в/из сокета
             DataOutputStream dout = new DataOutputStream(client.getOutputStream());
             DataInputStream din = new DataInputStream(client.getInputStream());
 
 
-            // начинаем диалог с подключенным клиентом в цикле, пока сокет не закрыт
-            while(!client.isClosed()) {
+            while (!client.isClosed()) {
 
                 System.out.println("Server waiting for request...");
 
-                // сервер ждёт в канале чтения din получения данных клиента
+                // ожидание данных в канале чтения
                 String req = din.readUTF();
 
-                // после получения данных считывает их
                 if (req.contains("GET /")) {
 
-                    String filename = req.substring(req.indexOf(" /"), req.indexOf(" HTTP"));
+                    String filename = req.substring(req.indexOf("/"), req.indexOf(" HTTP"));
                     System.out.println("Filename: " + filename);
 
-                    File image = new File(filename);
-                    if (image.exists()) {
-                        dout.write((int) image.length());
-                    }
-                    else {
-                        dout.writeUTF("404 File Not Found\n");
-                    }
-
-                    dout.flush();
+                    File image = new File(resourcesPath + filename);
+                    Image.getImageFromServer(image, dout);
                 }
 
                 if (req.contains("POST "))     {
                     String filename = req.substring(req.indexOf(" /"), req.indexOf(" HTTP"));
                     System.out.println("Filename: " + filename);
 
-                    File image = new File(filename);
-                    if (image.exists()) {
-                        dout.write((int) image.length());
+                    File image = new File(clientImagesPath + filename);
+                    File serverCopy = new File(resourcesPath + filename);
+
+                    if (filename.contains("jpg") || filename.contains("png"))   {
+                        String response = Image.saveImageOnServer(image, serverCopy);
+                        dout.writeUTF(response);
                     }
                 }
 
-
-                // если условие окончания работы не верно - продолжаем работу - отправляем эхо-ответ  обратно клиенту
-                System.out.println("Server Wrote message to client.");
                 dout.flush();
             }
 
-            // если условие выхода - верно выключаем соединения
-            System.out.println("Client disconnected");
-            System.out.println("Closing connections & channels.");
+            System.out.println("Closing connections");
 
-            // закрываем сначала каналы сокета !
             din.close();
             dout.close();
 
-            // потом закрываем сам сокет общения на стороне сервера!
-            client.close();
+            client.close(); // server socket closed
 
-            // потом закрываем сокет сервера который создаёт сокеты общения
-            // хотя при многопоточном применении его закрывать не нужно
-            // для возможности поставить этот серверный сокет обратно в ожидание нового подключения
-
-            System.out.println("Closing connections & channels - DONE.");
 
         } catch (IOException e) {
             e.printStackTrace();
