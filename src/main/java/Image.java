@@ -1,3 +1,7 @@
+import org.apache.commons.io.IOUtils;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
 
@@ -5,43 +9,20 @@ import java.nio.file.Files;
 public class Image {
 
 
-    static void getImageFromServer(File image, DataOutputStream dos) throws IOException {
+    static void getImageFromServer(File image, BufferedOutputStream bos) throws IOException {
 
-        if (image.exists()) {
             System.out.println("Image Found on Server");
 
-            byte buf[] = new byte[100 * 1024];
-            FileInputStream fis = new FileInputStream(image);
-
-            while (fis.available() > 0)
-            {
-                //dos.write(fis.read(buf));
-                dos.writeUTF(image.getName());
-            }
-            fis.close();
-        }
-        else {
-            System.out.println("File Not Found");
-            dos.writeUTF("HTTP 404 File Not Found\n");
-        }
+            IOUtils.copy(new FileInputStream(image), bos);
+            System.out.println("Image sent to client");
     }
 
-    static String saveImageOnServer(File image, File serverCopy) throws IOException {
+    static String saveImageOnServer(File image, BufferedInputStream bis) throws IOException {
 
         String response = "default";
 
-        if (serverCopy.exists()) {
-            response = "Image with same name already exists";
-            System.out.println(response);
-        }
-        else if (!image.exists()) {
-            response = "No image found";
-            System.out.println(response);
-        }
-        else {
-            Files.copy(image.toPath(), new FileOutputStream(serverCopy));
-            response = RestApi.postResponse(image.getName());
-        }
+        IOUtils.copy(bis, new FileOutputStream(image));
+        response = RestApi.postResponse(image.getName());
 
         return response;
     }

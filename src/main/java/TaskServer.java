@@ -1,6 +1,12 @@
+
+import org.apache.commons.io.Charsets;
+import org.apache.commons.io.IOUtils;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.Charset;
+import java.util.Arrays;
 
 
 public class TaskServer {
@@ -9,60 +15,63 @@ public class TaskServer {
     public static void main(String[] args) throws IOException {
 
         String resourcesPath = "/Users/user/IdeaProjects/MultiServer/src/main/resources"; // server image store
-        File resources = new File(resourcesPath);
-        String clientImagesPath = "/Users/user/Downloads"; // client's image store
 
-        try (ServerSocket server = new ServerSocket(4444))  {
 
+        try {
+
+            ServerSocket server = new ServerSocket(4444);
             Socket client = server.accept();    // server socket opened
             System.out.println("Connection accepted.\n");
 
-            DataOutputStream dout = new DataOutputStream(client.getOutputStream());
-            DataInputStream din = new DataInputStream(client.getInputStream());
+            BufferedOutputStream bos = new BufferedOutputStream(client.getOutputStream());
+            BufferedInputStream bis = new BufferedInputStream(client.getInputStream());
+
+            //DataInputStream dis = new DataInputStream(client.getInputStream());     // to read HTTP request
+            //DataOutputStream dos = new DataOutputStream(client.getOutputStream());     // to write text
 
 
             while (!client.isClosed()) {
 
                 System.out.println("Server waiting for request...");
+                String request = IOUtils.toString(bis, "UTF-8");
+                System.out.println("request: " + request);
 
-                // ожидание данных в канале чтения
-                String req = din.readUTF();
+                if (request.startsWith("GET /")) {
 
-                if (req.contains("GET /")) {
-
-                    String filename = req.substring(req.indexOf("/"), req.indexOf(" HTTP"));
+                    String filename = request.substring(request.indexOf("/"), request.indexOf(" HTTP"));
                     System.out.println("Filename: " + filename);
 
-                    File image = new File(resourcesPath + filename);
-                    Image.getImageFromServer(image, dout);
-                }
-
-                if (req.contains("POST "))     {
-                    String filename = req.substring(req.indexOf(" /"), req.indexOf(" HTTP"));
-                    System.out.println("Filename: " + filename);
-
-                    File image = new File(clientImagesPath + filename);
-                    File serverCopy = new File(resourcesPath + filename);
-
-                    if (filename.contains("jpg") || filename.contains("png"))   {
-                        String response = Image.saveImageOnServer(image, serverCopy);
-                        dout.writeUTF(response);
+                    File downloadImage = new File(resourcesPath + filename + ".jpg");
+                    if (downloadImage.exists()) {
+                        Image.getImageFromServer(downloadImage, bos);
+                    } else {
+                        System.out.println("File Not Found\n");
+                        bos.write("HTTP 404 File Not Found\n".getBytes());
                     }
                 }
 
-                dout.flush();
+                if (request.startsWith("POST ")) {
+                    String filename = request.substring(request.indexOf(" /"), request.indexOf(" HTTP"));
+                    System.out.println("Filename: " + filename);
+
+                    File imageToUpload = new File(resourcesPath + filename);
+
+                    String response = Image.saveImageOnServer(imageToUpload, bis);
+                    bos.write(response.getBytes());
+                }
+
+                bos.flush();
             }
 
             System.out.println("Closing connections");
 
-            din.close();
-            dout.close();
+            bis.close();
+            bos.close();
 
             client.close(); // server socket closed
 
-
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (IOException ex) {
+            ex.getStackTrace();
         }
     }
 }
